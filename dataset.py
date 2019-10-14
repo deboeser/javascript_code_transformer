@@ -33,9 +33,7 @@ def collate_fn(insts):
 
 
 class TranslationDataset(torch.utils.data.Dataset):
-    def __init__(
-        self, src_word2idx, tgt_word2idx,
-        src_insts=None, tgt_insts=None):
+    def __init__(self, src_word2idx, tgt_word2idx, src_insts=None, tgt_insts=None):
 
         assert src_insts
         assert not tgt_insts or (len(src_insts) == len(tgt_insts))
