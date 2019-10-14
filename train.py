@@ -7,12 +7,13 @@ import math
 import time
 
 from tqdm import tqdm
+import pickle
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 import transformer.Constants as Constants
-from dataset import TranslationDataset, paired_collate_fn
+from dataset import CodeDocstringDatasetPreprocessed, paired_collate_fn
 from transformer.Models import Transformer
 from transformer.Optim import ScheduledOptim
 
@@ -204,11 +205,14 @@ def main():
 
     parser.add_argument('-epoch', type=int, default=10)
     parser.add_argument('-batch_size', type=int, default=4)
+    parser.add_argument('-num_workers', type=int, default=0)
 
     parser.add_argument('-d_model', type=int, default=512)
     parser.add_argument('-d_inner_hid', type=int, default=2048)
     parser.add_argument('-d_k', type=int, default=64)
     parser.add_argument('-d_v', type=int, default=64)
+    parser.add_argument('-max_code_seq_len', type=int, default=512)
+    parser.add_argument('-max_token_seq_len', type=int, default=48)
 
     parser.add_argument('-n_head', type=int, default=8)
     parser.add_argument('-n_layers', type=int, default=6)
@@ -231,8 +235,9 @@ def main():
     opt.d_word_vec = opt.d_model
 
     # ========= Loading Dataset ========= #
-    data = torch.load(opt.data)
-    opt.max_token_seq_len = data['settings'].max_token_seq_len
+    with open(opt.data, "rb") as f:
+        data = pickle.load(f)
+    opt.max_seq_len = max(opt.max_code_seq_len, opt.max_token_seq_len)
 
     training_data, validation_data = prepare_dataloaders(data, opt)
 
@@ -250,7 +255,7 @@ def main():
     transformer = Transformer(
         opt.src_vocab_size,
         opt.tgt_vocab_size,
-        opt.max_token_seq_len,
+        opt.max_seq_len,
         tgt_emb_prj_weight_sharing=opt.proj_share_weight,
         emb_src_tgt_weight_sharing=opt.embs_share_weight,
         d_k=opt.d_k,
@@ -274,22 +279,26 @@ def main():
 def prepare_dataloaders(data, opt):
     # ========= Preparing DataLoader =========#
     train_loader = torch.utils.data.DataLoader(
-        TranslationDataset(
+        CodeDocstringDatasetPreprocessed(
             src_word2idx=data['dict']['src'],
             tgt_word2idx=data['dict']['tgt'],
             src_insts=data['train']['src'],
-            tgt_insts=data['train']['tgt']),
-        num_workers=0,
+            tgt_insts=data['train']['tgt'],
+            src_max_len=opt.max_code_seq_len,
+            tgt_max_len=opt.max_token_seq_len),
+        num_workers=opt.num_workers,
         batch_size=opt.batch_size,
         collate_fn=paired_collate_fn,
         shuffle=True)
 
     valid_loader = torch.utils.data.DataLoader(
-        TranslationDataset(
+        CodeDocstringDatasetPreprocessed(
             src_word2idx=data['dict']['src'],
             tgt_word2idx=data['dict']['tgt'],
             src_insts=data['valid']['src'],
-            tgt_insts=data['valid']['tgt']),
+            tgt_insts=data['valid']['tgt'],
+            src_max_len=opt.max_code_seq_len,
+            tgt_max_len=opt.max_token_seq_len),
         num_workers=0,
         batch_size=opt.batch_size,
         collate_fn=paired_collate_fn)
