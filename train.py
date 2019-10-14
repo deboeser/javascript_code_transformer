@@ -16,6 +16,7 @@ from dataset import TranslationDataset, paired_collate_fn
 from transformer.Models import Transformer
 from transformer.Optim import ScheduledOptim
 
+
 def cal_performance(pred, gold, smoothing=False):
     ''' Apply label smoothing if needed '''
 
@@ -47,7 +48,8 @@ def cal_loss(pred, gold, smoothing):
         loss = -(one_hot * log_prb).sum(dim=1)
         loss = loss.masked_select(non_pad_mask).sum()  # average later
     else:
-        loss = F.cross_entropy(pred, gold, ignore_index=Constants.PAD, reduction='sum')
+        loss = F.cross_entropy(
+            pred, gold, ignore_index=Constants.PAD, reduction='sum')
 
     return loss
 
@@ -92,6 +94,7 @@ def train_epoch(model, training_data, optimizer, device, smoothing):
     accuracy = n_word_correct/n_word_total
     return loss_per_word, accuracy
 
+
 def eval_epoch(model, validation_data, device):
     ''' Epoch operation in evaluation phase '''
 
@@ -107,7 +110,8 @@ def eval_epoch(model, validation_data, device):
                 desc='  - (Validation) ', leave=False):
 
             # prepare data
-            src_seq, src_pos, tgt_seq, tgt_pos = map(lambda x: x.to(device), batch)
+            src_seq, src_pos, tgt_seq, tgt_pos = map(
+                lambda x: x.to(device), batch)
             gold = tgt_seq[:, 1:]
 
             # forward
@@ -125,6 +129,7 @@ def eval_epoch(model, validation_data, device):
     loss_per_word = total_loss/n_word_total
     accuracy = n_word_correct/n_word_total
     return loss_per_word, accuracy
+
 
 def train(model, training_data, validation_data, optimizer, device, opt):
     ''' Start training '''
@@ -150,17 +155,17 @@ def train(model, training_data, validation_data, optimizer, device, opt):
         start = time.time()
         train_loss, train_accu = train_epoch(
             model, training_data, optimizer, device, smoothing=opt.label_smoothing)
-        print('  - (Training)   ppl: {ppl: 8.5f}, accuracy: {accu:3.3f} %, '\
+        print('  - (Training)   ppl: {ppl: 8.5f}, accuracy: {accu:3.3f} %, '
               'elapse: {elapse:3.3f} min'.format(
                   ppl=math.exp(min(train_loss, 100)), accu=100*train_accu,
                   elapse=(time.time()-start)/60))
 
         start = time.time()
         valid_loss, valid_accu = eval_epoch(model, validation_data, device)
-        print('  - (Validation) ppl: {ppl: 8.5f}, accuracy: {accu:3.3f} %, '\
-                'elapse: {elapse:3.3f} min'.format(
-                    ppl=math.exp(min(valid_loss, 100)), accu=100*valid_accu,
-                    elapse=(time.time()-start)/60))
+        print('  - (Validation) ppl: {ppl: 8.5f}, accuracy: {accu:3.3f} %, '
+              'elapse: {elapse:3.3f} min'.format(
+                  ppl=math.exp(min(valid_loss, 100)), accu=100*valid_accu,
+                  elapse=(time.time()-start)/60))
 
         valid_accus += [valid_accu]
 
@@ -172,7 +177,8 @@ def train(model, training_data, validation_data, optimizer, device, opt):
 
         if opt.save_model:
             if opt.save_mode == 'all':
-                model_name = opt.save_model + '_accu_{accu:3.3f}.chkpt'.format(accu=100*valid_accu)
+                model_name = opt.save_model + \
+                    '_accu_{accu:3.3f}.chkpt'.format(accu=100*valid_accu)
                 torch.save(checkpoint, model_name)
             elif opt.save_mode == 'best':
                 model_name = opt.save_model + '.chkpt'
@@ -189,6 +195,7 @@ def train(model, training_data, validation_data, optimizer, device, opt):
                     epoch=epoch_i, loss=valid_loss,
                     ppl=math.exp(min(valid_loss, 100)), accu=100*valid_accu))
 
+
 def main():
     ''' Main function '''
     parser = argparse.ArgumentParser()
@@ -196,7 +203,7 @@ def main():
     parser.add_argument('-data', required=True)
 
     parser.add_argument('-epoch', type=int, default=10)
-    parser.add_argument('-batch_size', type=int, default=64)
+    parser.add_argument('-batch_size', type=int, default=4)
 
     #parser.add_argument('-d_word_vec', type=int, default=512)
     parser.add_argument('-d_model', type=int, default=512)
@@ -214,7 +221,8 @@ def main():
 
     parser.add_argument('-log', default=None)
     parser.add_argument('-save_model', default=None)
-    parser.add_argument('-save_mode', type=str, choices=['all', 'best'], default='best')
+    parser.add_argument('-save_mode', type=str,
+                        choices=['all', 'best'], default='best')
 
     parser.add_argument('-no_cuda', action='store_true')
     parser.add_argument('-label_smoothing', action='store_true')
@@ -261,7 +269,7 @@ def main():
             betas=(0.9, 0.98), eps=1e-09),
         opt.d_model, opt.n_warmup_steps)
 
-    train(transformer, training_data, validation_data, optimizer, device ,opt)
+    train(transformer, training_data, validation_data, optimizer, device, opt)
 
 
 def prepare_dataloaders(data, opt):

@@ -7,9 +7,11 @@ from transformer.Layers import EncoderLayer, DecoderLayer
 
 __author__ = "Yu-Hsiang Huang"
 
+
 def get_non_pad_mask(seq):
     assert seq.dim() == 2
     return seq.ne(Constants.PAD).type(torch.float).unsqueeze(-1)
+
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
     ''' Sinusoid position encoding table '''
@@ -20,7 +22,8 @@ def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
     def get_posi_angle_vec(position):
         return [cal_angle(position, hid_j) for hid_j in range(d_hid)]
 
-    sinusoid_table = np.array([get_posi_angle_vec(pos_i) for pos_i in range(n_position)])
+    sinusoid_table = np.array([get_posi_angle_vec(pos_i)
+                               for pos_i in range(n_position)])
 
     sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
     sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
@@ -31,15 +34,18 @@ def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
 
     return torch.FloatTensor(sinusoid_table)
 
+
 def get_attn_key_pad_mask(seq_k, seq_q):
     ''' For masking out the padding part of key sequence. '''
 
     # Expand to fit the shape of key query attention matrix.
     len_q = seq_q.size(1)
     padding_mask = seq_k.eq(Constants.PAD)
-    padding_mask = padding_mask.unsqueeze(1).expand(-1, len_q, -1)  # b x lq x lk
+    padding_mask = padding_mask.unsqueeze(
+        1).expand(-1, len_q, -1)  # b x lq x lk
 
     return padding_mask
+
 
 def get_subsequent_mask(seq):
     ''' For masking out the subsequent info. '''
@@ -47,9 +53,11 @@ def get_subsequent_mask(seq):
     sz_b, len_s = seq.size()
     subsequent_mask = torch.triu(
         torch.ones((len_s, len_s), device=seq.device, dtype=torch.uint8), diagonal=1)
-    subsequent_mask = subsequent_mask.unsqueeze(0).expand(sz_b, -1, -1)  # b x ls x ls
+    subsequent_mask = subsequent_mask.unsqueeze(
+        0).expand(sz_b, -1, -1)  # b x ls x ls
 
     return subsequent_mask
+
 
 class Encoder(nn.Module):
     ''' A encoder model with self attention mechanism. '''
@@ -98,6 +106,7 @@ class Encoder(nn.Module):
             return enc_output, enc_slf_attn_list
         return enc_output,
 
+
 class Decoder(nn.Module):
     ''' A decoder model with self attention mechanism. '''
 
@@ -129,8 +138,10 @@ class Decoder(nn.Module):
         non_pad_mask = get_non_pad_mask(tgt_seq)
 
         slf_attn_mask_subseq = get_subsequent_mask(tgt_seq)
-        slf_attn_mask_keypad = get_attn_key_pad_mask(seq_k=tgt_seq, seq_q=tgt_seq)
-        slf_attn_mask = (slf_attn_mask_keypad + slf_attn_mask_subseq).gt(0)
+        slf_attn_mask_keypad = get_attn_key_pad_mask(
+            seq_k=tgt_seq, seq_q=tgt_seq)
+        slf_attn_mask = (slf_attn_mask_keypad +
+                         slf_attn_mask_subseq.bool()).gt(0)
 
         dec_enc_attn_mask = get_attn_key_pad_mask(seq_k=src_seq, seq_q=tgt_seq)
 
@@ -151,6 +162,7 @@ class Decoder(nn.Module):
         if return_attns:
             return dec_output, dec_slf_attn_list, dec_enc_attn_list
         return dec_output,
+
 
 class Transformer(nn.Module):
     ''' A sequence to sequence model with attention mechanism. '''
@@ -181,7 +193,7 @@ class Transformer(nn.Module):
         nn.init.xavier_normal_(self.tgt_word_prj.weight)
 
         assert d_model == d_word_vec, \
-        'To facilitate the residual connections, \
+            'To facilitate the residual connections, \
          the dimensions of all module outputs shall be the same.'
 
         if tgt_emb_prj_weight_sharing:
@@ -194,7 +206,7 @@ class Transformer(nn.Module):
         if emb_src_tgt_weight_sharing:
             # Share the weight matrix between source & target word embeddings
             assert n_src_vocab == n_tgt_vocab, \
-            "To share word embedding table, the vocabulary size of src/tgt shall be the same."
+                "To share word embedding table, the vocabulary size of src/tgt shall be the same."
             self.encoder.src_word_emb.weight = self.decoder.tgt_word_emb.weight
 
     def forward(self, src_seq, src_pos, tgt_seq, tgt_pos):
