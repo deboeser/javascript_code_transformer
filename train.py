@@ -271,7 +271,7 @@ def main():
         optim.Adam(
             filter(lambda x: x.requires_grad, transformer.parameters()),
             betas=(0.9, 0.98), eps=1e-09),
-        opt.d_model, opt.n_warmup_steps)
+        opt.d_model, opt.n_warmup_steps, opt.batch_size)
 
     train(transformer, training_data, validation_data, optimizer, device, opt)
 
